@@ -1,0 +1,152 @@
+
+<!DOCTYPE html>
+<html lang="es">
+<head>
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width,initial-scale=1">
+<meta name="theme-color" content="#101522">
+<title>Audio Lab iPhone</title>
+<style>
+  body {
+    margin: 0; padding: 24px;
+    background: #101522; color: #f4f6ff;
+    font: 17px -apple-system, sans-serif;
+  }
+  main { max-width: 520px; margin: auto; }
+  h1 { font-size: 28px; }
+  .panel {
+    background: #1b2435; padding: 20px;
+    border-radius: 18px; margin: 16px 0;
+  }
+  label { display: block; margin: 18px 0 8px; }
+  input[type=range] { width: 100%; }
+  button {
+    border: 0; border-radius: 12px; padding: 13px;
+    font-size: 16px; margin-top: 12px; width: 100%;
+  }
+  .note { color: #bdc9df; font-size: 14px; line-height: 1.5; }
+</style>
+</head>
+<body>
+<main>
+  <h1>🎧 Audio Lab</h1>
+  <p class="note">Ecualización de audio local en tu iPhone.</p>
+
+  <section class="panel">
+    <label for="file">Selecciona una canción o archivo de audio</label>
+    <input id="file" type="file" accept="audio/*">
+    <audio id="audio" controls style="width:100%;margin-top:18px"></audio>
+
+    <label for="bass">Graves: <span id="bv">+2</span> dB</label>
+    <input id="bass" type="range" min="-6" max="6" value="2" step="1">
+
+    <label for="voice">Presencia vocal: <span id="vv">+1</span> dB</label>
+    <input id="voice" type="range" min="-6" max="6" value="1" step="1">
+
+    <label for="treble">Agudos: <span id="tv">+1</span> dB</label>
+    <input id="treble" type="range" min="-6" max="6" value="1" step="1">
+
+    <label for="level">Nivel de salida: <span id="lv">80</span>%</label>
+    <input id="level" type="range" min="0" max="100" value="80">
+
+    <button id="apply">Activar procesamiento</button>
+    <button id="reset">Restablecer ajustes</button>
+  </section>
+
+  <p class="note">
+    El efecto se aplica únicamente al audio reproducido aquí.
+    Usa volumen moderado. No aumenta la capacidad física del
+    altavoz ni garantiza la eliminación de distorsión.
+  </p>
+</main>
+
+<script>
+const audio = document.querySelector("#audio");
+const file = document.querySelector("#file");
+
+let ctx, source, bass, voice, treble, gain;
+let objectURL;
+
+function setup() {
+  if (ctx) {
+    if (ctx.state === "suspended") ctx.resume();
+    return;
+  }
+
+  ctx = new (window.AudioContext || window.webkitAudioContext)();
+
+  source = ctx.createMediaElementSource(audio);
+
+  bass = ctx.createBiquadFilter();
+  bass.type = "lowshelf";
+  bass.frequency.value = 120;
+
+  voice = ctx.createBiquadFilter();
+  voice.type = "peaking";
+  voice.frequency.value = 2500;
+  voice.Q.value = 0.8;
+
+  treble = ctx.createBiquadFilter();
+  treble.type = "highshelf";
+  treble.frequency.value = 8000;
+
+  gain = ctx.createGain();
+  gain.gain.value = 0.8;
+
+  source.connect(bass);
+  bass.connect(voice);
+  voice.connect(treble);
+  treble.connect(gain);
+  gain.connect(ctx.destination);
+
+  update();
+}
+
+function update() {
+  if (!ctx) return;
+
+  bass.gain.value = +document.querySelector("#bass").value;
+  voice.gain.value = +document.querySelector("#voice").value;
+  treble.gain.value = +document.querySelector("#treble").value;
+  gain.gain.value = +document.querySelector("#level").value / 100;
+
+  document.querySelector("#bv").textContent = bass.gain.value;
+  document.querySelector("#vv").textContent = voice.gain.value;
+  document.querySelector("#tv").textContent = treble.gain.value;
+  document.querySelector("#lv").textContent =
+    document.querySelector("#level").value;
+}
+
+file.addEventListener("change", () => {
+  const f = file.files[0];
+  if (!f) return;
+
+  if (objectURL) URL.revokeObjectURL(objectURL);
+  objectURL = URL.createObjectURL(f);
+  audio.src = objectURL;
+});
+
+document.querySelectorAll('input[type="range"]')
+  .forEach(el => el.addEventListener("input", update));
+
+document.querySelector("#apply").addEventListener("click", async () => {
+  setup();
+  await ctx.resume();
+  update();
+  try {
+    await audio.play();
+  } catch (e) {
+    alert("Pulsa Reproducir en el reproductor de audio.");
+  }
+});
+
+document.querySelector("#reset").addEventListener("click", () => {
+  document.querySelector("#bass").value = 0;
+  document.querySelector("#voice").value = 0;
+  document.querySelector("#treble").value = 0;
+  document.querySelector("#level").value = 80;
+  update();
+});
+</script>
+</body>
+</html>
